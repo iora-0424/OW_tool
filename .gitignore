@@ -1,0 +1,14 @@
+# キャプチャ画像
+captures/
+
+# ログ
+logs/
+
+# デバッグ用スクリプト
+test*.py
+
+# デバッグ用ファイル
+debug.png
+
+# デバッグ用イメージフォルダ
+test_images/
