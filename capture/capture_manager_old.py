@@ -7,6 +7,7 @@ import psutil
 import win32gui
 import win32process
 
+from config.settings import CaptureConfig, PathConfig, ScoreboardConfig
 from logger.logger import get_logger
 
 logger = get_logger()
@@ -50,12 +51,12 @@ class CaptureManager:
             tuple(frame, result)
         """
 
-        time.sleep(0.10)
+        time.sleep(ScoreboardConfig.DISPLAY_DELAY)
 
         best_frame = None
         best_result = None
 
-        for i in range(3):
+        for i in range(ScoreboardConfig.FRAME_COUNT):
 
             frame = self.capture.capture()
 
@@ -77,7 +78,7 @@ class CaptureManager:
                 best_result = result
                 best_frame = frame
 
-            time.sleep(0.05)
+            time.sleep(ScoreboardConfig.FRAME_INTERVAL)
 
         return best_frame, best_result
 
@@ -86,14 +87,14 @@ class CaptureManager:
         スクリーンショット保存
         """
 
-        os.makedirs("captures", exist_ok=True)
+        os.makedirs(PathConfig.CAPTURES_DIR, exist_ok=True)
 
         filename = datetime.now().strftime(
             "%Y%m%d_%H%M%S_%f"
         )[:-3]
 
         filepath = os.path.join(
-            "captures",
+            PathConfig.CAPTURES_DIR,
             f"{filename}.png"
         )
 
@@ -117,7 +118,7 @@ class CaptureManager:
 
             process = psutil.Process(pid)
 
-            return process.name().lower() == "overwatch.exe"
+            return process.name().lower() == CaptureConfig.GAME_PROCESS
 
         except Exception as e:
 

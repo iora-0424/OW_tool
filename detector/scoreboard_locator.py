@@ -1,6 +1,8 @@
 import cv2
 from dataclasses import dataclass
 
+from config.settings import ScoreboardConfig
+
 
 @dataclass
 class MatchResult:
@@ -10,7 +12,11 @@ class MatchResult:
 
 
 class ScoreboardLocator:
-    def __init__(self, template_path: str, threshold: float = 0.90):
+    def __init__(
+        self,
+        template_path: str,
+        threshold: float = ScoreboardConfig.DEFAULT_HEADER_THRESHOLD,
+    ):
         """
         template_path : ヘッダーテンプレート画像
         threshold     : 一致率

@@ -1,10 +1,10 @@
 import logging
-import os
+from config.settings import PathConfig
 
 
 def get_logger():
 
-    os.makedirs("logs", exist_ok=True)
+    PathConfig.LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger("OWLogger")
 
@@ -29,7 +29,7 @@ def get_logger():
     # ファイル
     #
     file = logging.FileHandler(
-        "logs/ow_logger.log",
+        PathConfig.LOG_FILE,
         encoding="utf-8"
     )
 

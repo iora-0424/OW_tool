@@ -1,4 +1,4 @@
-import os
+import re
 import time
 from datetime import datetime
 
@@ -8,28 +8,10 @@ import psutil
 import win32gui
 import win32process
 
+from config.settings import CaptureConfig, PathConfig, ScoreboardConfig
 from logger.logger import get_logger
 
 logger = get_logger()
-
-
-# =====================================
-# Map Name ROI
-# =====================================
-
-MAP_ROI_X = 1323
-MAP_ROI_Y = 13
-MAP_ROI_WIDTH = 420
-MAP_ROI_HEIGHT = 42
-
-
-# =====================================
-# Frame Quality Threshold
-# =====================================
-
-QUALITY_MEAN_MIN = 20
-QUALITY_MEAN_MAX = 200
-QUALITY_STD_MIN = 30
 
 
 class CaptureManager:
@@ -39,10 +21,12 @@ class CaptureManager:
         capture,
         locator,
         match_buffer,
+        map_recognizer,
     ):
         self.capture = capture
         self.locator = locator
         self.match_buffer = match_buffer
+        self.map_recognizer = map_recognizer
 
     def process_tab_press(self):
         """
@@ -73,10 +57,15 @@ class CaptureManager:
         if not self.is_valid_frame(frame):
             return
 
-        frame_to_save = self.match_buffer.update(frame)
+        map_name = self.map_recognizer.recognize(frame)
+        if map_name is None:
+            logger.info("Frame rejected (map name unavailable)")
+            return
 
-        if frame_to_save is not None:
-            self.save_capture(frame_to_save)
+        capture_to_save = self.match_buffer.update(frame, map_name)
+
+        if capture_to_save is not None:
+            self.save_capture(*capture_to_save)
 
     def capture_best_frame(self):
         """
@@ -87,12 +76,12 @@ class CaptureManager:
             tuple(frame, result)
         """
 
-        time.sleep(0.10)
+        time.sleep(ScoreboardConfig.DISPLAY_DELAY)
 
         best_frame = None
         best_result = None
 
-        for i in range(3):
+        for i in range(ScoreboardConfig.FRAME_COUNT):
 
             frame = self.capture.capture()
 
@@ -114,70 +103,49 @@ class CaptureManager:
                 best_result = result
                 best_frame = frame
 
-            time.sleep(0.05)
+            time.sleep(ScoreboardConfig.FRAME_INTERVAL)
 
         return best_frame, best_result
 
     def is_valid_frame(self, frame):
         """
-        マップ名ROIの品質チェック。
-
-        暗転・白飛びなど、
-        比較に向かない画像は除外する。
+        画面全体の平均輝度が許容範囲内か確認する。
         """
 
-        roi = frame[
-            MAP_ROI_Y:MAP_ROI_Y + MAP_ROI_HEIGHT,
-            MAP_ROI_X:MAP_ROI_X + MAP_ROI_WIDTH,
-        ]
-
-        gray = cv2.cvtColor(
-            roi,
-            cv2.COLOR_BGR2GRAY,
-        )
-
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         mean = np.mean(gray)
-        std = np.std(gray)
+        logger.info("Frame Quality : screen mean=%.1f", mean)
 
-        logger.info(
-            "Frame Quality : mean=%.1f std=%.1f",
-            mean,
-            std,
-        )
-
-        if mean < QUALITY_MEAN_MIN:
+        if mean < ScoreboardConfig.QUALITY_MEAN_MIN:
             logger.info("Frame rejected (too dark)")
             return False
 
-        if mean > QUALITY_MEAN_MAX:
+        if mean > ScoreboardConfig.QUALITY_MEAN_MAX:
             logger.info("Frame rejected (too bright)")
-            return False
-
-        if std < QUALITY_STD_MIN:
-            logger.info("Frame rejected (low contrast)")
             return False
 
         logger.info("Frame accepted")
 
         return True
 
-    def save_capture(self, frame):
+    def save_capture(self, frame, map_name: str):
         """
         スクリーンショット保存
         """
 
-        os.makedirs("captures", exist_ok=True)
+        PathConfig.CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
 
         filename = datetime.now().strftime(
             "%Y%m%d_%H%M%S_%f"
         )[:-3]
 
-        filepath = os.path.join(
-            "captures",
-            f"{filename}.png"
-        )
-
-        cv2.imwrite(filepath, frame)
+        safe_map_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", map_name).rstrip(" .")
+        filepath = PathConfig.CAPTURES_DIR / f"{filename}_{safe_map_name}.png"
+        encoded, png = cv2.imencode(".png", frame)
+        if not encoded:
+            logger.error("Could not encode capture: %s", filepath)
+            return
+        filepath.write_bytes(png.tobytes())
 
         logger.info("Saved : %s", filepath)
 
@@ -197,7 +165,7 @@ class CaptureManager:
 
             process = psutil.Process(pid)
 
-            return process.name().lower() == "overwatch.exe"
+            return process.name().lower() == CaptureConfig.GAME_PROCESS
 
         except Exception as e:
 
@@ -210,7 +178,7 @@ class CaptureManager:
         終了時に最後の1枚を保存する
         """
 
-        frame = self.match_buffer.flush()
+        capture_to_save = self.match_buffer.flush()
 
-        if frame is not None:
-            self.save_capture(frame)
+        if capture_to_save is not None:
+            self.save_capture(*capture_to_save)

@@ -3,8 +3,10 @@ from capture.game_capture import GameCapture
 from capture.capture_manager import CaptureManager
 from capture.match_buffer import MatchBuffer
 
+from config.settings import ScoreboardConfig
+
 from detector.scoreboard_locator import ScoreboardLocator
-from detector.map_comparator import MapComparator
+from detector.map_recognizer import MapRecognizer
 
 from logger.logger import get_logger
 
@@ -15,21 +17,17 @@ listener = KeyboardListener()
 capture = GameCapture()
 
 locator = ScoreboardLocator(
-    "template/header.png",
-    threshold=0.80
+    ScoreboardConfig.HEADER_TEMPLATE,
+    threshold=ScoreboardConfig.HEADER_THRESHOLD
 )
 
-map_comparator = MapComparator()
-
-match_buffer = MatchBuffer(
-    comparator=map_comparator,
-    threshold=0.985,
-)
+match_buffer = MatchBuffer()
 
 manager = CaptureManager(
     capture=capture,
     locator=locator,
     match_buffer=match_buffer,
+    map_recognizer=MapRecognizer(),
 )
 
 logger.info("==========")

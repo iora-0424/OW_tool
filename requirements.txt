@@ -1,0 +1,12 @@
+# Overwatch scoreboard capture (Windows)
+keyboard
+mss
+numpy
+opencv-python
+psutil
+pywin32
+scikit-image
+
+# Map OCR (also requires Tesseract with English language data)
+pytesseract
+rapidfuzz

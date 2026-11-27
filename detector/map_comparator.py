@@ -1,26 +1,10 @@
 import cv2
 from skimage.metrics import structural_similarity as ssim
 
+from config.settings import ImageConfig, MatchConfig, ROIConfig
 from logger.logger import get_logger
 
 logger = get_logger()
-
-
-# ======================================================
-# ROI (1920x1080 Fullscreen)
-# ======================================================
-
-MAP_ROI_X = 1323
-MAP_ROI_Y = 13
-MAP_ROI_WIDTH = 420
-MAP_ROI_HEIGHT = 42
-
-# ======================================================
-# Comparison
-# ======================================================
-
-SLIDE_RANGE = 10
-COMPARE_WIDTH = MAP_ROI_WIDTH - (SLIDE_RANGE * 2)
 
 
 class MapComparator:
@@ -58,8 +42,8 @@ class MapComparator:
     def _crop(self, frame):
 
         return frame[
-            MAP_ROI_Y:MAP_ROI_Y + MAP_ROI_HEIGHT,
-            MAP_ROI_X:MAP_ROI_X + MAP_ROI_WIDTH,
+            ROIConfig.MAP_Y:ROIConfig.MAP_Y + ROIConfig.MAP_HEIGHT,
+            ROIConfig.MAP_X:ROIConfig.MAP_X + ROIConfig.MAP_WIDTH,
         ]
 
     def _preprocess(self, roi):
@@ -71,8 +55,8 @@ class MapComparator:
 
         # 明るさ補正
         clahe = cv2.createCLAHE(
-            clipLimit=2.0,
-            tileGridSize=(8, 8),
+            clipLimit=ImageConfig.CLAHE_CLIP_LIMIT,
+            tileGridSize=ImageConfig.CLAHE_TILE_GRID_SIZE,
         )
 
         gray = clahe.apply(gray)
@@ -80,15 +64,15 @@ class MapComparator:
         # 軽いノイズ除去
         gray = cv2.GaussianBlur(
             gray,
-            (3, 3),
+            MatchConfig.BLUR_KERNEL,
             0,
         )
 
         # 輪郭のみ抽出
         edge = cv2.Canny(
             gray,
-            50,
-            150,
+            ImageConfig.CANNY_LOW_THRESHOLD,
+            ImageConfig.CANNY_HIGH_THRESHOLD,
         )
 
         return edge
@@ -99,24 +83,26 @@ class MapComparator:
         img2,
     ):
 
+        slide_range = MatchConfig.SLIDE_RANGE
+        compare_width = ROIConfig.MAP_WIDTH - 2 * slide_range
         base = img1[
             :,
-            SLIDE_RANGE:SLIDE_RANGE + COMPARE_WIDTH,
+            slide_range:slide_range + compare_width,
         ]
 
         best_score = -1.0
         best_offset = 0
 
         for offset in range(
-            -SLIDE_RANGE,
-            SLIDE_RANGE + 1,
+            -slide_range,
+            slide_range + 1,
         ):
 
-            start = SLIDE_RANGE + offset
+            start = slide_range + offset
 
             target = img2[
                 :,
-                start:start + COMPARE_WIDTH,
+                start:start + compare_width,
             ]
 
             score = ssim(base, target)
